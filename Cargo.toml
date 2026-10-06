@@ -1,0 +1,44 @@
+[package]
+name = "startrailmitigator"
+version = "0.1.0"
+edition = "2021"
+description = "Detects elongated (trailed) stars in wide-angle astro-landscape photographs and replaces them with round stars anchored at the start of the trail."
+license = "MIT"
+repository = "https://github.com/gschlossnagle/startrailmitigator"
+
+[lib]
+name = "strm"
+path = "src/lib.rs"
+
+[[bin]]
+name = "strm"
+path = "src/bin/strm.rs"
+
+[dependencies]
+anyhow = "1"
+thiserror = "2"
+clap = { version = "4", features = ["derive"] }
+log = "0.4"
+env_logger = "0.11"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rayon = "1"
+nalgebra = "0.35"
+levenberg-marquardt = "0.15"
+libm = "0.2"
+rand = "0.9"
+rand_distr = "0.5"
+tiff = "0.11"
+image = { version = "0.25", default-features = false, features = ["png"] }
+kamadak-exif = "0.6"
+rawler = "0.8"
+
+[profile.release]
+opt-level = 3
+debug = 1
+
+[profile.dev]
+opt-level = 1
+
+[profile.test]
+opt-level = 2
