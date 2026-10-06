@@ -75,13 +75,13 @@ pub fn gaussian_blur(src: &Plane, sigma: f64) -> (Plane, f32) {
     for y in 0..h {
         let row = src.row(y);
         let out = tmp.row_mut(y);
-        for x in 0..w {
+        for (x, o) in out.iter_mut().enumerate() {
             let mut acc = 0.0;
             for (k, kv) in kernel.iter().enumerate() {
                 let xx = (x as i64 + k as i64 - radius).clamp(0, w as i64 - 1) as usize;
                 acc += kv * row[xx];
             }
-            out[x] = acc;
+            *o = acc;
         }
     }
     let mut dst = Plane::new(w, h);
@@ -112,10 +112,9 @@ pub fn detect(
     let (filtered, noise_var_factor) = gaussian_blur(residual, opts.filter_sigma);
     let noise_factor = noise_var_factor.sqrt();
     let mut above = vec![false; w * h];
-    for i in 0..w * h {
+    for (i, a) in above.iter_mut().enumerate() {
         let masked = mask.map(|m| m.data[i] > 0.5).unwrap_or(false);
-        above[i] =
-            !masked && filtered.data[i] > opts.threshold_sigma * noise_factor * bg.noise.data[i];
+        *a = !masked && filtered.data[i] > opts.threshold_sigma * noise_factor * bg.noise.data[i];
     }
 
     let mut labels = vec![0u32; w * h];

@@ -43,7 +43,7 @@ fn median_inplace(v: &mut [f32]) -> f32 {
         a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
     });
     let m = *m;
-    if n % 2 == 0 {
+    if n.is_multiple_of(2) {
         let lower = v[..mid].iter().cloned().fold(f32::NEG_INFINITY, f32::max);
         0.5 * (m + lower)
     } else {

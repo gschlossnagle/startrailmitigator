@@ -30,7 +30,15 @@ pub fn read_exif(path: &Path) -> Result<ShotInfo> {
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
     let exif = exif::Reader::new().read_from_container(&mut reader)?;
-    let get = |tag: Tag| exif.get_field(tag, In::PRIMARY).map(|f| &f.value);
+    // Look fields up by tag number so that a tag stored directly in the image
+    // directory (as this tool writes them) is found as well as one in the EXIF
+    // sub-directory; prefer the EXIF sub-directory when both exist.
+    let get = |tag: Tag| {
+        exif.fields()
+            .filter(|f| f.ifd_num == In::PRIMARY && f.tag.number() == tag.number())
+            .max_by_key(|f| u8::from(f.tag.context() == exif::Context::Exif))
+            .map(|f| &f.value)
+    };
     Ok(ShotInfo {
         exposure_s: get(Tag::ExposureTime).and_then(rational_f64),
         focal_length_mm: get(Tag::FocalLength).and_then(rational_f64),

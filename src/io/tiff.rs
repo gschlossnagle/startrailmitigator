@@ -113,6 +113,8 @@ pub fn save_tiff(path: &Path, image: &Image) -> Result<()> {
     Ok(())
 }
 
+/// Write the ICC profile and the few EXIF fields the pipeline relies on
+/// (exposure, focal length, camera) into the image directory.
 fn write_icc<W: std::io::Write + std::io::Seek, K: tiff::encoder::TiffKind>(
     dir: &mut tiff::encoder::DirectoryEncoder<'_, W, K>,
     image: &Image,
@@ -121,8 +123,41 @@ fn write_icc<W: std::io::Write + std::io::Seek, K: tiff::encoder::TiffKind>(
         dir.write_tag(Tag::IccProfile, &icc[..])
             .map_err(|e| anyhow!("writing ICC profile: {e}"))?;
     }
+    let rational = |v: f64| -> tiff::encoder::Rational {
+        if v >= 1.0 {
+            tiff::encoder::Rational {
+                n: (v * 1000.0).round() as u32,
+                d: 1000,
+            }
+        } else {
+            tiff::encoder::Rational {
+                n: 1_000_000,
+                d: (1_000_000.0 / v.max(1e-9)).round() as u32,
+            }
+        }
+    };
+    let shot = &image.shot;
+    if let Some(e) = shot.exposure_s.filter(|e| *e > 0.0) {
+        dir.write_tag(Tag::Unknown(TAG_EXPOSURE_TIME), rational(e))?;
+    }
+    if let Some(f) = shot.focal_length_mm.filter(|f| *f > 0.0) {
+        dir.write_tag(Tag::Unknown(TAG_FOCAL_LENGTH), rational(f))?;
+    }
+    if let Some(f) = shot.focal_length_35mm.filter(|f| *f > 0.0) {
+        dir.write_tag(Tag::Unknown(TAG_FOCAL_LENGTH_35MM), f.round() as u16)?;
+    }
+    if let Some(m) = &shot.camera_make {
+        dir.write_tag(Tag::Make, m.as_str())?;
+    }
+    if let Some(m) = &shot.camera_model {
+        dir.write_tag(Tag::Model, m.as_str())?;
+    }
     Ok(())
 }
+
+const TAG_EXPOSURE_TIME: u16 = 0x829a;
+const TAG_FOCAL_LENGTH: u16 = 0x920a;
+const TAG_FOCAL_LENGTH_35MM: u16 = 0xa405;
 
 #[inline]
 fn to_u16(v: f32) -> u16 {
@@ -151,6 +186,10 @@ mod tests {
             }
         }
         img.format.icc_profile = Some(vec![1, 2, 3, 4, 5]);
+        img.shot.exposure_s = Some(25.0);
+        img.shot.focal_length_mm = Some(24.0);
+        img.shot.focal_length_35mm = Some(24.0);
+        img.shot.camera_make = Some("Testcam".into());
         save_tiff(&path, &img).unwrap();
         let back = load_tiff(&path).unwrap();
         assert_eq!(back.width(), w);
@@ -158,6 +197,10 @@ mod tests {
         assert_eq!(back.channels(), 3);
         assert_eq!(back.format.bits, 16);
         assert_eq!(back.format.icc_profile, Some(vec![1, 2, 3, 4, 5]));
+        assert_eq!(back.shot.exposure_s, Some(25.0));
+        assert_eq!(back.shot.focal_length_mm, Some(24.0));
+        assert_eq!(back.shot.focal_length_35mm, Some(24.0));
+        assert_eq!(back.shot.camera_make.as_deref(), Some("Testcam"));
         for c in 0..3 {
             for i in 0..w * h {
                 assert!((back.planes[c].data[i] - img.planes[c].data[i]).abs() < 1e-6);

@@ -39,14 +39,16 @@ pub struct SynthParams {
 }
 
 impl SynthParams {
-    /// Roughly a 45 MP full-frame body at 14 mm for 20 s, scaled to the given size.
+    /// A crop from a 45 MP full-frame body (8256 px wide) at 14 mm for 20 s.
+    /// The pixel scale is that of the real sensor, so trails have realistic
+    /// lengths whatever the crop size.
     pub fn preset_wide(width: usize, height: usize) -> Self {
         Self {
             width,
             height,
             n_stars: (width * height / 8000).max(50),
             exposure_s: 20.0,
-            focal_px: 14.0 / 36.0 * width as f64,
+            focal_px: 14.0 / 36.0 * 8256.0,
             axis: crate::sky::nominal_axis(
                 crate::sky::Hemisphere::North,
                 crate::sky::Facing::S,
@@ -65,17 +67,26 @@ impl SynthParams {
         }
     }
 
-    /// Roughly a 100 MP body at 25 mm for 30 s, scaled to the given size.
+    /// A crop from a 100 MP full-frame body (11648 px wide) at 25 mm for 30 s.
     /// Trails are about four times longer than [`Self::preset_wide`].
     pub fn preset_long(width: usize, height: usize) -> Self {
         Self {
             exposure_s: 30.0,
-            focal_px: 25.0 / 36.0 * width as f64,
+            focal_px: 25.0 / 36.0 * 11648.0,
             psf_sigma: 1.4,
             n_stars: (width * height / 6000).max(50),
             seed: 11,
             ..Self::preset_wide(width, height)
         }
+    }
+}
+
+impl SynthParams {
+    /// Noise-free sky value at a pixel for one channel.
+    pub fn sky_value(&self, x: usize, y: usize, c: usize) -> f32 {
+        const TINT: [f32; 3] = [1.0, 0.95, 1.1];
+        let t = (x as f32 / self.width as f32) * 0.6 + (y as f32 / self.height as f32) * 0.4;
+        (self.sky_level + self.sky_gradient * (t - 0.5)) * TINT[c.min(2)]
     }
 }
 
@@ -109,13 +120,10 @@ pub fn generate(params: &SynthParams) -> (Image, Truth) {
 
     // Sky with a gradient.
     let mut planes: Vec<Plane> = (0..3).map(|_| Plane::new(w, h)).collect();
-    let tint = [1.0f32, 0.95, 1.1];
     for y in 0..h {
         for x in 0..w {
-            let t = (x as f32 / w as f32) * 0.6 + (y as f32 / h as f32) * 0.4;
-            let sky = params.sky_level + params.sky_gradient * (t - 0.5);
             for (c, p) in planes.iter_mut().enumerate() {
-                p.data[y * w + x] = sky * tint[c];
+                p.data[y * w + x] = params.sky_value(x, y, c);
             }
         }
     }
@@ -182,6 +190,8 @@ pub fn generate(params: &SynthParams) -> (Image, Truth) {
     img.shot = ShotInfo {
         exposure_s: Some(params.exposure_s),
         focal_length_35mm: Some(params.focal_px * 36.0 / w as f64),
+        focal_length_mm: Some(params.focal_px * 36.0 / w as f64),
+        sensor_width_mm: Some(36.0),
         ..Default::default()
     };
     (

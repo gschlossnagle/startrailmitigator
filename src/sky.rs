@@ -599,8 +599,8 @@ mod tests {
             seed ^= seed << 17;
             (seed % 1_000_000) as f64 / 1_000_000.0
         };
-        let w = (model.camera.cx * 2.0) as f64;
-        let h = (model.camera.cy * 2.0) as f64;
+        let w = model.camera.cx * 2.0;
+        let h = model.camera.cy * 2.0;
         for _ in 0..n {
             let x = rnd() * w;
             let y = rnd() * h;
