@@ -23,7 +23,7 @@ env_logger = "0.11"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rayon = "1"
-nalgebra = "0.35"
+nalgebra = { version = "0.35", features = ["serde-serialize"] }
 levenberg-marquardt = "0.15"
 libm = "0.2"
 rand = "0.9"

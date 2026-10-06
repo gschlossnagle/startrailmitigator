@@ -4,3 +4,12 @@
 //! global sky-rotation model to decide which end of each trail is the *start* of the
 //! exposure, and replaces each trail with a round star of the trail's width anchored
 //! at that start, filling the removed trail with matching sky background.
+
+pub mod background;
+pub mod detect;
+pub mod image;
+pub mod io;
+pub mod moments;
+pub mod sky;
+pub mod synth;
+pub mod trail_model;
